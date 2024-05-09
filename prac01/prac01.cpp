@@ -372,7 +372,7 @@ void DrawScene(HDC MyDC)
     gluLookAt(viewer[0], viewer[1], viewer[2],
         0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
 
-    
+    glMultMatrixd(trball.rMat);
 
     Quad(0, 3, 2, 1);
     Quad(1, 2, 6, 5);
