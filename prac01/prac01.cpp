@@ -9,8 +9,10 @@
 #include "gl/glu.h"
 #include "glut.h"
 
+#define PI 3.14159265358979323846
 #define MAX_LOADSTRING 100
 #define	IDT_TIMER	1
+
 
 // 전역 변수:
 HINSTANCE hInst;                                // 현재 인스턴스입니다.
@@ -31,6 +33,12 @@ bool bLButtonDown = false;
 bool bSetupPixelFormat(HDC hdc);
 void Resize(int width, int height);
 void DrawScene(HDC MyDC);
+
+GLUquadric* pObj;
+void BaseArm(void);
+void LowerArm(void);
+void UpperArm(void);
+
 GLfloat viewer[3] = { 2.0f, 2.0f, 2.0f };
 
 //-----------------------------------------------------
@@ -130,6 +138,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 //
 //        이 함수를 통해 인스턴스 핸들을 전역 변수에 저장하고
 //        주 프로그램 창을 만든 다음 표시합니다.
+// 
 //
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
@@ -177,6 +186,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
         // virtual trackball
         trball.initialize();
+
+        // create a quadric object
+        pObj = gluNewQuadric();
+        gluQuadricDrawStyle(pObj, GLU_LINE);
 
         break;
 
@@ -268,6 +281,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         case VK_ESCAPE:
             DestroyWindow(hWnd);
             break;
+        case 0x57: // 어퍼 암을 시계 방향으로 회전시키기
+
         }
         InvalidateRect(hWnd, NULL, true);
         break;
@@ -281,6 +296,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
         // Destroy a timer
         KillTimer(hWnd, IDT_TIMER);
+
+        // delete a quadric object
+        gluDeleteQuadric(pObj);
 
         PostQuitMessage(0);
         break;
@@ -339,18 +357,22 @@ bool bSetupPixelFormat(HDC hdc)
 
     return true;
 }
+/*
+ * Resize : to resize the window
+*/
 
-void Resize(int width, int height)
+void Resize(const int cx, const int cy)
 {
     glMatrixMode(GL_PROJECTION); 
     glLoadIdentity();
 
-    glViewport(0, 0, width, height);
+    glViewport(0, 0, cx, cy);
 
-    float cx = width;
-    float cy = height;
-
-    gluPerspective(90, (GLdouble)width / (GLdouble)height, 1.0, 1000.0);
+    // 3D orthographic viewing
+    if (cx <= cy)
+        glOrtho( -2.0, 2.0, -2.0 * (GLfloat)cy / (GLfloat)cx, 2.0 * (GLfloat)cy / (GLfloat)cx, 1.0, 10.0);
+    else
+        glOrtho(-2.0 * (GLfloat)cx / (GLfloat)cy, 2.0 * (GLfloat)cx / (GLfloat)cy, -2.0, 2.0, 1.0, 10.0);
 
     return;
 
@@ -367,20 +389,51 @@ void DrawScene(HDC MyDC)
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
     glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
+    glLoadIdentity(); // Identity matrix - CTM (Current Transformation Matrix)
     
     gluLookAt(viewer[0], viewer[1], viewer[2],
         0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
 
     glMultMatrixd(trball.rMat);
 
+    // 층밀림 행렬 직접 입력하기
+    /*
+    GLfloat m[16];
+    for (int i = 0; i < 16; i++) m[i] = 0.0f;
+    m[0] = m[5] = m[10] = m[15] = 1.0f;
+    m[4] = 1.0f / tanf(60 / 180.f * PI);
+    glMultMatrixf(m);
+    */
+
+
+    glPushMatrix(); // push the current matrix to the stack
+    glTranslatef(0.0f, -1.0f, 0.0f); // post-multiply the current matrix by a translation matrix
+
+    /*
+    glColor3f(1.0f, 0.0f, 0.0f);
+
+    //glutWireTetrahedron(); // tetrahedron
+
+    glPopMatrix(); // pop the current matrix from the stack
+
+    glTranslatef(0.0f, 1.0f, 0.0f);
+
+    glColor3f(0.0f, 1.0f, 0.0f);
+    glutWireCube(0.5); // cube
+    */
+
+    /*
     Quad(0, 3, 2, 1);
     Quad(1, 2, 6, 5);
     Quad(2, 3, 7, 6);
     Quad(3, 0, 4, 7);
     Quad(4, 5, 6, 7);
     Quad(5, 4, 0, 1);
+    */
 
+    BaseArm();
+    LowerArm();
+    UpperArm();
        
     SwapBuffers(MyDC);
 
@@ -401,4 +454,45 @@ void Quad(int a, int b, int c, int d)
     glEnd();
 
     return;
+}
+/*
+ * BaseArm : the base arm (radius : 0.5, height : 0.3)
+ */
+void BaseArm(void)
+{
+    glPushMatrix();
+    glColor3f(1.0f, 0.0f, 0.0f);
+    glRotatef(-90.0f, 1.0f, 0.0f, 0.0f);
+    gluCylinder(pObj, 0.5, 0.5, 0.3, 20, 1);
+    glPopMatrix();
+
+    return;
+}
+/*
+ * LowerArm : the lower arm (width : 0.2, height : 1.0, depth : 0.2)
+ */
+void LowerArm(void)
+{
+	glPushMatrix();
+	glColor3f(0.0f, 1.0f, 0.0f);
+	glTranslatef(0.0f, 0.7f, 0.0f);
+	glScalef(0.2f, 1.0f, 0.2f);
+    glutWireCube(1.0);
+	glPopMatrix();
+
+	return;
+}
+/*
+ * UpperArm : the upper arm (width : 0.2, height : 0.8, depth : 0.2)
+ */
+void UpperArm(void)
+{
+	glPushMatrix();
+	glColor3f(0.0f, 0.0f, 1.0f);
+	glTranslatef(0.0f, 1.6f, 0.0f);
+	glScalef(0.2f, 0.8f, 0.2f);
+	glutWireCube(1.0);
+	glPopMatrix();
+
+	return;
 }
